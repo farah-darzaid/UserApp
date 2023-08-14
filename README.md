@@ -53,7 +53,7 @@ php artisan migrate:fresh
 ``` bash
 php artisan db:seed
 ```
-*note:nothing will be added from seeder so far
+* note:nothing will be added from seeder so far
 
 ## Using the app
 * Start a PHP server, by running this command:
