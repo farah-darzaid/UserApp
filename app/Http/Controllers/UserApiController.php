@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreUserRequest;
+use App\Mail\WelcomeMail;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class UserApiController extends Controller
@@ -27,34 +29,49 @@ class UserApiController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'email' => ['required'
-//                'email:rfc,spoof',
-//                Rule::unique('users', 'email')->withoutTrashed(),
+        $validator = Validator::make($request->all(), [
+            'email' => [
+                'required',
+                'email:rfc,spoof',
+                Rule::unique('users', 'email')->withoutTrashed(),
             ],
-//            'name' => [
-//                'required',
-//                'string',
-//                'max:191'
-//            ],
-//            'birthday' => [
-//                'required',
-//                'date',
-//                'date_format:Y-m-d',
-//                'before:-18 years'
-//            ],
-//            'phone' => [
-//                'required',
-//                'string',
-//                'between:8,11',
-//                Rule::unique('users', 'phone')->withoutTrashed(),
-//            ]
+            'name' => [
+                'required',
+                'string',
+                'max:191'
+            ],
+            'birthdate' => [
+                'required',
+                'date',
+                'date_format:Y-m-d',
+                'before:-18 years'
+            ],
+            'phone' => [
+                'required',
+                'numeric',
+                'regex:/^([0-9\s\-\+\(\)]*)$/',
+                Rule::unique('users', 'phone')->withoutTrashed(),
+            ]
         ]);
 
-        dd($request->validated());
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->getMessageBag()->messages()
+            ]);
+        }
 
+        $user = User::query()->create($request->all());
 
-        dd('store user data');
+        if ($user->wasRecentlyCreated) {
+
+            Mail::to($user->email)->send(new WelcomeMail($user));
+
+            return response()->json([
+                'success' => true,
+                'data' => $user
+            ]);
+        }
     }
 
     /**
@@ -62,15 +79,19 @@ class UserApiController extends Controller
      */
     public function show(string $id)
     {
-        //
-    }
+        $user = User::query()->find($id);
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found'
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $user
+        ]);
     }
 
     /**
@@ -78,7 +99,53 @@ class UserApiController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $user = User::query()->find($id);
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found'
+            ]);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'email' => [
+                'required',
+                'email:rfc,spoof',
+                Rule::unique('users', 'email')->ignore($user->id)->withoutTrashed(),
+            ],
+            'name' => [
+                'required',
+                'string',
+                'max:191'
+            ],
+            'birthdate' => [
+                'required',
+                'date',
+                'date_format:Y-m-d',
+                'before:-18 years'
+            ],
+            'phone' => [
+                'required',
+                'numeric',
+                'regex:/^([0-9\s\-\+\(\)]*)$/',
+                Rule::unique('users', 'phone')->ignore($user->id)->withoutTrashed(),
+            ]
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->getMessageBag()->messages()
+            ]);
+        }
+
+        $user->update($request->all());
+
+        return response()->json([
+            'success' => true,
+            'data' => $user
+        ]);
     }
 
     /**
@@ -86,6 +153,20 @@ class UserApiController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $user = User::query()->find($id);
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found'
+            ]);
+        }
+
+        $user->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User deleted'
+        ]);
     }
 }
